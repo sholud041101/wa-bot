@@ -5,58 +5,32 @@ const app = express();
 app.use(bodyParser.urlencoded({ extended: false }));
 
 app.post("/whatsapp", (req, res) => {
-  const pesan = (req.body.Body || "").toLowerCase();
+  const pesan = (req.body.Body || "").toLowerCase().trim();
 
-  // JIKA USER BARU / KETIK HALO
+  let balasan = "";
+
   if (pesan === "halo" || pesan === "hai" || pesan === "hi") {
-    res.set("Content-Type", "text/xml");
-    res.send(`
-<Response>
-  <Message>
-    <Body>Halo 👋 Silakan pilih menu:</Body>
-    <Interactive>
-      <Type>button</Type>
-      <Action>
-        <Buttons>
-          <Button>
-            <Type>reply</Type>
-            <Reply>
-              <Id>laporan_harian</Id>
-              <Title>Laporan Harian</Title>
-            </Reply>
-          </Button>
-          <Button>
-            <Type>reply</Type>
-            <Reply>
-              <Id>upload_foto</Id>
-              <Title>Upload Foto</Title>
-            </Reply>
-          </Button>
-          <Button>
-            <Type>reply</Type>
-            <Reply>
-              <Id>laporan_keuangan</Id>
-              <Title>Keuangan</Title>
-            </Reply>
-          </Button>
-        </Buttons>
-      </Action>
-    </Interactive>
-  </Message>
-</Response>
-    `);
-    return;
-  }
+    balasan =
+`Halo 👋
+Silakan pilih menu:
 
-  // JIKA USER KLIK TOMBOL
-  let balasan = "Menu tidak dikenali.";
+1️⃣ Laporan Harian
+2️⃣ Upload Foto
+3️⃣ Laporan Keuangan
 
-  if (pesan.includes("laporan_harian")) {
+Balas dengan angka (1/2/3).`;
+  } 
+  else if (pesan === "1") {
     balasan = "📝 Silakan ketik laporan harian Anda.";
-  } else if (pesan.includes("upload_foto")) {
+  } 
+  else if (pesan === "2") {
     balasan = "📷 Silakan kirim foto laporan.";
-  } else if (pesan.includes("laporan_keuangan")) {
+  } 
+  else if (pesan === "3") {
     balasan = "💰 Silakan ketik laporan keuangan.";
+  } 
+  else {
+    balasan = "❓ Menu tidak dikenali. Ketik *halo* untuk melihat menu.";
   }
 
   res.set("Content-Type", "text/xml");
@@ -67,8 +41,7 @@ app.post("/whatsapp", (req, res) => {
   `);
 });
 
-app.listen(3000, () => {
-  console.log("Bot dengan tombol sudah berjalan di port 3000");
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log("Bot WhatsApp berjalan di port " + PORT);
 });
-
-
