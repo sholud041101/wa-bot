@@ -4,8 +4,8 @@
   "description": "Bot Telegram SPPG Tlogorejo Uploader",
   "main": "bot.js",
   "scripts": {
-    "start": "node bot.js"
-  },
+  "start": "node index.js"
+},
   "keywords": [
     "telegram",
     "bot",
