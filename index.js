@@ -15,7 +15,6 @@ const bot = new Telegraf(BOT_TOKEN);
 bot.use(session());
 
 // --- 1. FITUR TOMBOL MENU BIRU (COMMANDS) ---
-// Ini yang memunculkan menu biru di pojok kiri bawah
 bot.telegram.setMyCommands([
     { command: 'start', description: '🏠 Mulai / Menu Utama' },
     { command: 'help', description: '❓ Bantuan' },
@@ -23,15 +22,13 @@ bot.telegram.setMyCommands([
 ]);
 
 // --- 2. TAMPILAN MENU UTAMA (MODEL KEYBOARD) ---
-// Ini yang membuat tombol besar di bawah layar (seperti "Find a partner")
 const showMainMenu = (ctx) => {
     const text = "👋 *Sistem Pelaporan SPPG*\n\nSilakan pilih Divisi Anda lewat tombol di bawah:";
     
-    // Perhatikan: Kita pakai Markup.keyboard (bukan inlineKeyboard)
-    // .resize() wajib dipakai agar tombolnya tidak kegedean
+    // Tombol Besar di Bawah Layar
     const keyboard = Markup.keyboard([
-        ['💰 Akuntan', '🥦 Ahli Gizi'], // Baris 1
-        ['👷 Asisten Lapangan']         // Baris 2
+        ['💰 Akuntan', '🥦 Ahli Gizi'],
+        ['👷 Asisten Lapangan']
     ]).resize(); 
 
     ctx.reply(text, { parse_mode: 'Markdown', ...keyboard });
@@ -42,13 +39,11 @@ bot.start((ctx) => {
     showMainMenu(ctx);
 });
 
-// --- 3. MENANGKAP TOMBOL KEYBOARD (Pakai bot.hears) ---
-// Karena tombol keyboard itu mengirim teks, kita tangkap teksnya
+// --- 3. MENANGKAP TOMBOL KEYBOARD ---
 
-// A. Jika user klik "💰 Akuntan"
+// A. Divisi Akuntan
 bot.hears('💰 Akuntan', (ctx) => {
     const text = "📂 *Divisi Akuntan*\nSilakan pilih jenis dokumen:";
-    // Sub-menu tetap pakai Inline (gelembung) biar rapi
     const keyboard = Markup.inlineKeyboard([
         [Markup.button.callback('📄 Nota PO', 'pilih_PO')],
         [Markup.button.callback('📊 RAB Harian', 'pilih_RAB')],
@@ -58,7 +53,7 @@ bot.hears('💰 Akuntan', (ctx) => {
     ctx.reply(text, { parse_mode: 'Markdown', ...keyboard });
 });
 
-// B. Jika user klik "🥦 Ahli Gizi"
+// B. Divisi Ahli Gizi
 bot.hears('🥦 Ahli Gizi', (ctx) => {
     const text = "🥦 *Divisi Ahli Gizi*\nSilakan pilih jenis dokumen:";
     const keyboard = Markup.inlineKeyboard([
@@ -69,51 +64,56 @@ bot.hears('🥦 Ahli Gizi', (ctx) => {
     ctx.reply(text, { parse_mode: 'Markdown', ...keyboard });
 });
 
-// C. Jika user klik "👷 Asisten Lapangan"
+// C. Divisi Asisten Lapangan (SUDAH DIUPDATE) ✅
 bot.hears('👷 Asisten Lapangan', (ctx) => {
     const text = "👷 *Divisi Aslap*\nSilakan pilih jenis dokumen:";
+    // Kita susun tombolnya agar rapi (2 kolom)
     const keyboard = Markup.inlineKeyboard([
         [Markup.button.callback('📸 Foto Menu Jadi', 'pilih_FotoMenu')],
         [Markup.button.callback('📦 Penerimaan Barang', 'pilih_Barang')],
+        [Markup.button.callback('📝 Rekap PM Harian', 'pilih_RekapPM')],           // <-- Baru
+        [Markup.button.callback('🚚 Dokumentasi Distribusi', 'pilih_DokDistribusi')], // <-- Baru
         [Markup.button.callback('❌ Tutup', 'tutup_menu')]
     ]);
     ctx.reply(text, { parse_mode: 'Markdown', ...keyboard });
 });
 
-// --- 4. LOGIKA PILIHAN & UPLOAD (Sama seperti sebelumnya) ---
+// --- 4. LOGIKA PILIHAN & UPLOAD ---
 
-const handleChoice = (ctx, kategori) => {
+const handleChoice = (ctx, kategori, namaLengkap) => {
     ctx.session = { waitingForUpload: true, kategori: kategori };
-    // Hapus keyboard bawah sementara saat minta upload (biar fokus)
+    // Gunakan nama lengkap jika ada, kalau tidak pakai kategori pendek
+    const label = namaLengkap || kategori;
+    
     ctx.reply(
-        `✅ Kategori terpilih: *${kategori}*.\n\nSilakan **KIRIM FOTO/FILE** sekarang.`, 
+        `✅ Kategori terpilih: *${label}*.\n\nSilakan **KIRIM FOTO/FILE** sekarang.`, 
         { parse_mode: 'Markdown', ...Markup.removeKeyboard() } 
     );
 };
 
-// Daftarkan Tombol Inline
+// Daftarkan Semua Tombol
 bot.action('pilih_PO', (ctx) => handleChoice(ctx, 'PO'));
 bot.action('pilih_RAB', (ctx) => handleChoice(ctx, 'RAB'));
 bot.action('pilih_Laporan', (ctx) => handleChoice(ctx, 'Laporan'));
 bot.action('pilih_MenuGizi', (ctx) => handleChoice(ctx, 'Gizi'));
 bot.action('pilih_Organoleptik', (ctx) => handleChoice(ctx, 'Organoleptik'));
+
+// Update Tombol Aslap
 bot.action('pilih_FotoMenu', (ctx) => handleChoice(ctx, 'Menu Jadi'));
 bot.action('pilih_Barang', (ctx) => handleChoice(ctx, 'Barang'));
+bot.action('pilih_RekapPM', (ctx) => handleChoice(ctx, 'Rekap PM', 'Rekapitulasi PM Harian')); // <-- Baru
+bot.action('pilih_DokDistribusi', (ctx) => handleChoice(ctx, 'Distribusi', 'Dokumentasi Distribusi')); // <-- Baru
 
-// Tombol Tutup/Batal
-bot.action('tutup_menu', (ctx) => {
-    ctx.deleteMessage(); // Hapus menu inline
-});
+bot.action('tutup_menu', (ctx) => ctx.deleteMessage());
 bot.command('cancel', (ctx) => {
     ctx.session = {};
     ctx.reply("Proses dibatalkan.", Markup.removeKeyboard());
-    setTimeout(() => showMainMenu(ctx), 1000); // Munculkan menu lagi
+    setTimeout(() => showMainMenu(ctx), 1000);
 });
 
 // --- 5. PROSES UPLOAD KE N8N ---
 bot.on(['photo', 'document'], async (ctx) => {
     if (!ctx.session || !ctx.session.waitingForUpload) {
-        // Jika user kirim foto sembarangan, ingatkan pakai tombol
         return ctx.reply("⚠️ Silakan klik tombol Divisi di bawah dulu untuk memilih kategori.", {
             ...Markup.keyboard([
                 ['💰 Akuntan', '🥦 Ahli Gizi'],
@@ -134,12 +134,11 @@ bot.on(['photo', 'document'], async (ctx) => {
                 sender: ctx.from.first_name
             });
             await ctx.telegram.deleteMessage(ctx.chat.id, loading.message_id);
-            await ctx.reply(`✅ *Sukses!* Dokumen *${ctx.session.kategori}* berhasil disimpan.`);
+            await ctx.reply(`✅ *Sukses!* Dokumen berhasil disimpan.`);
         } else {
             ctx.reply("❌ Link n8n error.");
         }
         
-        // Reset dan tampilkan menu utama lagi
         ctx.session = {};
         showMainMenu(ctx);
 
@@ -150,8 +149,7 @@ bot.on(['photo', 'document'], async (ctx) => {
 });
 
 bot.launch();
-console.log('🤖 Bot dengan Menu Keyboard & Tombol Biru SIAP!');
+console.log('🤖 Bot Update Aslap SIAP!');
 
-// Graceful Stop
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
