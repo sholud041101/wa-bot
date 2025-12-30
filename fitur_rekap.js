@@ -1,4 +1,4 @@
-// FILE: fitur_rekap.js
+const { Markup } = require('telegraf');
 
 // --- Helper: Tanggal Indo ---
 function getIndonesianDate() {
@@ -30,42 +30,37 @@ BUSUI=0`;
 
 module.exports = function(bot) {
 
-    // Debugging: Cek apakah file ini terpanggil
-    console.log("--> ✅ Modul Rekapitulasi SIAP (Handler terdaftar)");
+    console.log("--> ✅ Modul Rekapitulasi (Update Fitur Cek) SIAP");
 
-    // 1. HANDLE TOMBOL 'pilih_RekapPM'
+    // 1. HANDLE TOMBOL MENU 'pilih_RekapPM'
     bot.action('pilih_RekapPM', async (ctx) => {
         try {
-            // PENTING: Matikan loading icon segera
-            await ctx.answerCbQuery(); 
-
-            // Reset session
+            await ctx.answerCbQuery();
             if(ctx.session) ctx.session.waitingForUpload = false;
 
-            // Kirim Pesan Panduan
             await ctx.reply(
                 "📋 <b>FORMULIR LAPORAN HARIAN</b>\n\n" +
-                "Silakan <b>Copy</b> template di bawah, <b>Isi Angkanya</b>, lalu <b>Kirim</b> kembali.\n" +
-                "<i>(Bot akan menghitung total otomatis)</i>",
+                "Silakan <b>Copy</b> template di bawah, <b>Isi Angkanya</b>, lalu <b>Kirim</b>.\n" +
+                "<i>(Nanti akan ada fitur pengecekan sebelum final)</i>",
                 { parse_mode: 'HTML' }
             );
-
-            // Kirim Template (Gunakan tag <pre> agar mudah dicopy di HP)
             await ctx.reply(`<pre>${templateLaporan}</pre>`, { parse_mode: 'HTML' });
-
         } catch (error) {
-            console.error("❌ Error di tombol Rekap:", error);
-            ctx.reply("Maaf, terjadi kesalahan sistem.");
+            console.error("❌ Error tombol rekap:", error);
         }
     });
 
-    // 2. PROSES HITUNG LAPORAN
+    // 2. PROSES INPUT & TAMPILKAN PREVIEW (DRAFT)
     bot.hears(/^\/lapor/i, async (ctx) => {
         try {
+            // Inisialisasi session jika belum ada
+            ctx.session = ctx.session || {};
+
             const text = ctx.message.text;
             const lines = text.split('\n');
             let data = {};
             
+            // Parsing Data
             lines.forEach(line => {
                 if(line.includes('=')) {
                     const parts = line.split('=');
@@ -87,8 +82,8 @@ module.exports = function(bot) {
             const totalB3 = (data['BALITA']||0) + (data['BUMIL']||0) + (data['BUSUI']||0);
             const grandTotal = totalSiswa + totalB3;
 
-            // --- Output (Gunakan HTML agar aman dari karakter aneh) ---
-            const finalReport = `
+            // --- Susun Laporan ---
+            const reportContent = `
 <b>${getIndonesianDate()}</b>
 
 <b>SPPG Mitra Mandiri Temanggung (Tlogorejo)</b>
@@ -130,14 +125,71 @@ Terdiri dari :
 - Bumil : ${data['BUMIL']||0}
 - Busui : ${data['BUSUI']||0}
 
-<b>III. Kegiatan berjalan lancar dan dokumentasi terlampir</b>
-`;
-            
-            await ctx.reply(finalReport, { parse_mode: 'HTML' });
+<b>III. Kegiatan berjalan lancar dan dokumentasi terlampir</b>`;
+
+            // SIMPAN KE SESSION (Agar bisa dikirim nanti saat tombol 'Kirim' ditekan)
+            ctx.session.draftLaporan = reportContent;
+
+            // Tampilkan Preview dengan Tombol
+            await ctx.reply(
+                "⚠️ <b>KONFIRMASI DATA</b>\n\n" + 
+                "Berikut adalah tampilan laporan Anda. Apakah sudah benar?\n\n" + 
+                "---------------------------------" +
+                reportContent + 
+                "\n---------------------------------", 
+                { 
+                    parse_mode: 'HTML',
+                    ...Markup.inlineKeyboard([
+                        [Markup.button.callback('✅ Benar, Kirim Laporan', 'act_kirim_final')],
+                        [Markup.button.callback('✏️ Salah, Ingin Edit', 'act_edit_ulang')]
+                    ])
+                }
+            );
 
         } catch (error) {
             console.error("❌ Error hitung lapor:", error);
             ctx.reply("Format data salah. Pastikan copy-paste template dengan benar.");
         }
+    });
+
+    // 3. ACTION: JIKA TOMBOL 'KIRIM' DITEKAN
+    bot.action('act_kirim_final', async (ctx) => {
+        try {
+            // Ambil data dari session
+            const finalReport = ctx.session.draftLaporan;
+
+            if (!finalReport) {
+                return ctx.reply("⚠️ Sesi kadaluarsa. Silakan input ulang /lapor");
+            }
+
+            // Hapus menu tombol di pesan sebelumnya agar rapi
+            await ctx.deleteMessage(); 
+
+            // Kirim Laporan FINAL (Bersih)
+            await ctx.reply(finalReport, { parse_mode: 'HTML' });
+            
+            // Konfirmasi popup
+            await ctx.answerCbQuery("✅ Laporan Berhasil Dicetak!");
+
+            // Bersihkan session
+            ctx.session.draftLaporan = null;
+
+        } catch (error) {
+            console.error("Error kirim final:", error);
+            ctx.reply("Gagal mengirim laporan final.");
+        }
+    });
+
+    // 4. ACTION: JIKA TOMBOL 'EDIT' DITEKAN
+    bot.action('act_edit_ulang', async (ctx) => {
+        await ctx.answerCbQuery("✏️ Mode Edit");
+        await ctx.reply(
+            "🛠 <b>CARA EDIT:</b>\n\n" +
+            "1. <b>Copy/Salin</b> pesan formulir inputan Anda di atas yang salah.\n" +
+            "2. <b>Tempel</b> di kolom ketik.\n" +
+            "3. <b>Perbaiki</b> angkanya.\n" +
+            "4. <b>Kirim</b> ulang.",
+            { parse_mode: 'HTML' }
+        );
     });
 };
