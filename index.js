@@ -14,14 +14,22 @@ if (!BOT_TOKEN) {
 const bot = new Telegraf(BOT_TOKEN);
 bot.use(session());
 
-// --- 1. FITUR TOMBOL MENU BIRU (COMMANDS) ---
+// ==========================================================
+// 1. INTEGRASI MODUL BARU (REKAPITULASI OTOMATIS)
+// ==========================================================
+// Panggil file fitur_rekap.js yang baru kita buat
+// Ini akan menangani tombol 'pilih_RekapPM' secara khusus
+require('./fitur_rekap')(bot);
+
+
+// --- 2. FITUR TOMBOL MENU BIRU (COMMANDS) ---
 bot.telegram.setMyCommands([
     { command: 'start', description: '🏠 Mulai / Menu Utama' },
     { command: 'help', description: '❓ Bantuan' },
     { command: 'cancel', description: '❌ Batalkan Proses' }
 ]);
 
-// --- 2. TAMPILAN MENU UTAMA (MODEL KEYBOARD) ---
+// --- 3. TAMPILAN MENU UTAMA (MODEL KEYBOARD) ---
 const showMainMenu = (ctx) => {
     const text = "👋 *Sistem Pelaporan SPPG*\n\nSilakan pilih Divisi Anda lewat tombol di bawah:";
     
@@ -39,7 +47,7 @@ bot.start((ctx) => {
     showMainMenu(ctx);
 });
 
-// --- 3. MENANGKAP TOMBOL KEYBOARD ---
+// --- 4. MENANGKAP TOMBOL KEYBOARD ---
 
 // A. Divisi Akuntan
 bot.hears('💰 Akuntan', (ctx) => {
@@ -64,25 +72,26 @@ bot.hears('🥦 Ahli Gizi', (ctx) => {
     ctx.reply(text, { parse_mode: 'Markdown', ...keyboard });
 });
 
-// C. Divisi Asisten Lapangan (SUDAH DIUPDATE) ✅
+// C. Divisi Asisten Lapangan
 bot.hears('👷 Asisten Lapangan', (ctx) => {
     const text = "👷 *Divisi Aslap*\nSilakan pilih jenis dokumen:";
-    // Kita susun tombolnya agar rapi (2 kolom)
     const keyboard = Markup.inlineKeyboard([
         [Markup.button.callback('📸 Foto Menu Jadi', 'pilih_FotoMenu')],
         [Markup.button.callback('📦 Penerimaan Barang', 'pilih_Barang')],
-        [Markup.button.callback('📝 Rekap PM Harian', 'pilih_RekapPM')],           // <-- Baru
-        [Markup.button.callback('🚚 Dokumentasi Distribusi', 'pilih_DokDistribusi')], // <-- Baru
+        
+        // Tombol ini nanti akan ditangani oleh fitur_rekap.js
+        [Markup.button.callback('📝 Rekap PM Harian', 'pilih_RekapPM')],            
+
+        [Markup.button.callback('🚚 Dokumentasi Distribusi', 'pilih_DokDistribusi')],
         [Markup.button.callback('❌ Tutup', 'tutup_menu')]
     ]);
     ctx.reply(text, { parse_mode: 'Markdown', ...keyboard });
 });
 
-// --- 4. LOGIKA PILIHAN & UPLOAD ---
+// --- 5. LOGIKA PILIHAN & UPLOAD ---
 
 const handleChoice = (ctx, kategori, namaLengkap) => {
     ctx.session = { waitingForUpload: true, kategori: kategori };
-    // Gunakan nama lengkap jika ada, kalau tidak pakai kategori pendek
     const label = namaLengkap || kategori;
     
     ctx.reply(
@@ -91,18 +100,21 @@ const handleChoice = (ctx, kategori, namaLengkap) => {
     );
 };
 
-// Daftarkan Semua Tombol
+// Daftarkan Tombol Upload (KECUALI Rekap PM)
 bot.action('pilih_PO', (ctx) => handleChoice(ctx, 'PO'));
 bot.action('pilih_RAB', (ctx) => handleChoice(ctx, 'RAB'));
 bot.action('pilih_Laporan', (ctx) => handleChoice(ctx, 'Laporan'));
 bot.action('pilih_MenuGizi', (ctx) => handleChoice(ctx, 'Gizi'));
 bot.action('pilih_Organoleptik', (ctx) => handleChoice(ctx, 'Organoleptik'));
 
-// Update Tombol Aslap
+// Tombol Aslap (Upload)
 bot.action('pilih_FotoMenu', (ctx) => handleChoice(ctx, 'Menu Jadi'));
 bot.action('pilih_Barang', (ctx) => handleChoice(ctx, 'Barang'));
-bot.action('pilih_RekapPM', (ctx) => handleChoice(ctx, 'Rekap PM', 'Rekapitulasi PM Harian')); // <-- Baru
-bot.action('pilih_DokDistribusi', (ctx) => handleChoice(ctx, 'Distribusi', 'Dokumentasi Distribusi')); // <-- Baru
+bot.action('pilih_DokDistribusi', (ctx) => handleChoice(ctx, 'Distribusi', 'Dokumentasi Distribusi'));
+
+// PERHATIAN: Baris di bawah ini DIHAPUS karena sudah dipindah ke fitur_rekap.js
+// bot.action('pilih_RekapPM', (ctx) => handleChoice(ctx, 'Rekap PM', 'Rekapitulasi PM Harian')); 
+
 
 bot.action('tutup_menu', (ctx) => ctx.deleteMessage());
 bot.command('cancel', (ctx) => {
@@ -111,7 +123,7 @@ bot.command('cancel', (ctx) => {
     setTimeout(() => showMainMenu(ctx), 1000);
 });
 
-// --- 5. PROSES UPLOAD KE N8N ---
+// --- 6. PROSES UPLOAD KE N8N ---
 bot.on(['photo', 'document'], async (ctx) => {
     if (!ctx.session || !ctx.session.waitingForUpload) {
         return ctx.reply("⚠️ Silakan klik tombol Divisi di bawah dulu untuk memilih kategori.", {
