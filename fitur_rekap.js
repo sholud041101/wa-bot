@@ -30,7 +30,7 @@ BUSUI=0`;
 
 module.exports = function(bot) {
 
-    console.log("--> ✅ Modul Rekapitulasi (Update Fitur Cek) SIAP");
+    console.log("--> ✅ Modul Rekapitulasi (Final Update) SIAP");
 
     // 1. HANDLE TOMBOL MENU 'pilih_RekapPM'
     bot.action('pilih_RekapPM', async (ctx) => {
@@ -53,9 +53,7 @@ module.exports = function(bot) {
     // 2. PROSES INPUT & TAMPILKAN PREVIEW (DRAFT)
     bot.hears(/^\/lapor/i, async (ctx) => {
         try {
-            // Inisialisasi session jika belum ada
             ctx.session = ctx.session || {};
-
             const text = ctx.message.text;
             const lines = text.split('\n');
             let data = {};
@@ -127,10 +125,10 @@ Terdiri dari :
 
 <b>III. Kegiatan berjalan lancar dan dokumentasi terlampir</b>`;
 
-            // SIMPAN KE SESSION (Agar bisa dikirim nanti saat tombol 'Kirim' ditekan)
+            // SIMPAN KE SESSION
             ctx.session.draftLaporan = reportContent;
 
-            // Tampilkan Preview dengan Tombol
+            // Tampilkan Preview
             await ctx.reply(
                 "⚠️ <b>KONFIRMASI DATA</b>\n\n" + 
                 "Berikut adalah tampilan laporan Anda. Apakah sudah benar?\n\n" + 
@@ -155,21 +153,27 @@ Terdiri dari :
     // 3. ACTION: JIKA TOMBOL 'KIRIM' DITEKAN
     bot.action('act_kirim_final', async (ctx) => {
         try {
-            // Ambil data dari session
             const finalReport = ctx.session.draftLaporan;
 
             if (!finalReport) {
                 return ctx.reply("⚠️ Sesi kadaluarsa. Silakan input ulang /lapor");
             }
 
-            // Hapus menu tombol di pesan sebelumnya agar rapi
-            await ctx.deleteMessage(); 
+            // A. Hapus menu preview lama
+            await ctx.deleteMessage();
 
-            // Kirim Laporan FINAL (Bersih)
+            // B. Kirim Laporan FINAL (Laporan Utama)
             await ctx.reply(finalReport, { parse_mode: 'HTML' });
             
-            // Konfirmasi popup
-            await ctx.answerCbQuery("✅ Laporan Berhasil Dicetak!");
+            // C. Kirim Ucapan Terima Kasih (Pesan Tambahan)
+            await ctx.reply(
+                "✅ <b>DATA DITERIMA</b>\n\n" +
+                "Terima kasih telah melakukan pelaporan Penerima Manfaat Harian, data sudah diterima.",
+                { parse_mode: 'HTML' }
+            );
+
+            // D. Popup kecil
+            await ctx.answerCbQuery("✅ Terkirim!");
 
             // Bersihkan session
             ctx.session.draftLaporan = null;
@@ -185,8 +189,8 @@ Terdiri dari :
         await ctx.answerCbQuery("✏️ Mode Edit");
         await ctx.reply(
             "🛠 <b>CARA EDIT:</b>\n\n" +
-            "1. <b>Copy/Salin</b> pesan formulir inputan Anda di atas yang salah.\n" +
-            "2. <b>Tempel</b> di kolom ketik.\n" +
+            "1. <b>Salin (Copy)</b> pesan formulir Anda di atas yang salah.\n" +
+            "2. <b>Tempel (Paste)</b> di kolom ketik.\n" +
             "3. <b>Perbaiki</b> angkanya.\n" +
             "4. <b>Kirim</b> ulang.",
             { parse_mode: 'HTML' }
