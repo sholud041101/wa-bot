@@ -17,8 +17,6 @@ bot.use(session());
 // ==========================================================
 // 1. INTEGRASI MODUL BARU (REKAPITULASI OTOMATIS)
 // ==========================================================
-// Panggil file fitur_rekap.js yang baru kita buat
-// Ini akan menangani tombol 'pilih_RekapPM' secara khusus
 require('./fitur_rekap')(bot);
 
 
@@ -88,7 +86,7 @@ bot.hears('👷 Asisten Lapangan', (ctx) => {
     ctx.reply(text, { parse_mode: 'Markdown', ...keyboard });
 });
 
-// --- 5. LOGIKA PILIHAN & UPLOAD ---
+// --- 5. LOGIKA PILIHAN & UPLOAD (FILE/FOTO) ---
 
 const handleChoice = (ctx, kategori, namaLengkap) => {
     ctx.session = { waitingForUpload: true, kategori: kategori };
@@ -100,21 +98,15 @@ const handleChoice = (ctx, kategori, namaLengkap) => {
     );
 };
 
-// Daftarkan Tombol Upload (KECUALI Rekap PM)
+// Daftarkan Tombol Upload
 bot.action('pilih_PO', (ctx) => handleChoice(ctx, 'PO'));
 bot.action('pilih_RAB', (ctx) => handleChoice(ctx, 'RAB'));
 bot.action('pilih_Laporan', (ctx) => handleChoice(ctx, 'Laporan'));
 bot.action('pilih_MenuGizi', (ctx) => handleChoice(ctx, 'Gizi'));
 bot.action('pilih_Organoleptik', (ctx) => handleChoice(ctx, 'Organoleptik'));
-
-// Tombol Aslap (Upload)
 bot.action('pilih_FotoMenu', (ctx) => handleChoice(ctx, 'Menu Jadi'));
 bot.action('pilih_Barang', (ctx) => handleChoice(ctx, 'Barang'));
 bot.action('pilih_DokDistribusi', (ctx) => handleChoice(ctx, 'Distribusi', 'Dokumentasi Distribusi'));
-
-// PERHATIAN: Baris di bawah ini DIHAPUS karena sudah dipindah ke fitur_rekap.js
-// bot.action('pilih_RekapPM', (ctx) => handleChoice(ctx, 'Rekap PM', 'Rekapitulasi PM Harian')); 
-
 
 bot.action('tutup_menu', (ctx) => ctx.deleteMessage());
 bot.command('cancel', (ctx) => {
@@ -123,8 +115,9 @@ bot.command('cancel', (ctx) => {
     setTimeout(() => showMainMenu(ctx), 1000);
 });
 
-// --- 6. PROSES UPLOAD KE N8N ---
+// --- 6. PROSES UPLOAD FILE KE N8N ---
 bot.on(['photo', 'document'], async (ctx) => {
+    // Cek apakah user sudah menekan tombol kategori sebelumnya?
     if (!ctx.session || !ctx.session.waitingForUpload) {
         return ctx.reply("⚠️ Silakan klik tombol Divisi di bawah dulu untuk memilih kategori.", {
             ...Markup.keyboard([
@@ -135,12 +128,13 @@ bot.on(['photo', 'document'], async (ctx) => {
     }
 
     try {
-        const loading = await ctx.reply("🚀 Sedang mengirim ke arsip...");
+        const loading = await ctx.reply("🚀 Sedang mengirim file ke arsip...");
         let fileId = ctx.message.photo ? ctx.message.photo[ctx.message.photo.length - 1].file_id : ctx.message.document.file_id;
         const fileLink = await ctx.telegram.getFileLink(fileId);
 
         if (N8N_WEBHOOK_URL) {
             await axios.post(N8N_WEBHOOK_URL, {
+                type: 'file', // <--- Penanda untuk Switch n8n (Jalur Atas)
                 fileUrl: fileLink.href,
                 kategori: ctx.session.kategori,
                 sender: ctx.from.first_name
@@ -148,18 +142,58 @@ bot.on(['photo', 'document'], async (ctx) => {
             await ctx.telegram.deleteMessage(ctx.chat.id, loading.message_id);
             await ctx.reply(`✅ *Sukses!* Dokumen berhasil disimpan.`);
         } else {
-            ctx.reply("❌ Link n8n error.");
+            ctx.reply("❌ Link n8n error (Environment Variable kosong).");
         }
         
         ctx.session = {};
         showMainMenu(ctx);
 
     } catch (error) {
-        console.error("Error:", error);
-        ctx.reply("❌ Gagal upload.");
+        console.error("Error File:", error);
+        ctx.reply("❌ Gagal upload file.");
     }
 });
 
+// --- 7. HANDLER TEXT LAPORAN (PENAMBAHAN BARU) ---
+// Ini akan menangkap teks biasa yang diketik user
+bot.on('text', async (ctx) => {
+    const textPesan = ctx.message.text;
+
+    // Filter 1: Jangan respon jika itu Command (awalan /)
+    if (textPesan.startsWith('/')) return;
+
+    // Filter 2: Jangan respon jika itu Tombol Menu Utama (supaya tidak double)
+    if (['💰 Akuntan', '🥦 Ahli Gizi', '👷 Asisten Lapangan'].includes(textPesan)) return;
+
+    // Filter 3: Jangan respon tombol Cancel
+    if (textPesan === '❌ Batalkan Proses') return;
+
+    console.log(`📨 Menerima Teks Laporan: ${textPesan}`);
+    const loading = await ctx.reply('⏳ Sedang meneruskan laporan teks ke database...');
+
+    try {
+        if (N8N_WEBHOOK_URL) {
+            // Kirim ke n8n
+            await axios.post(N8N_WEBHOOK_URL, {
+                type: 'text',              // <--- PENTING: Kunci untuk Switch n8n (Jalur Bawah)
+                textContent: textPesan,    // Isi Laporan
+                sender: ctx.from.first_name,
+                date: new Date().toISOString()
+            });
+            
+            await ctx.telegram.deleteMessage(ctx.chat.id, loading.message_id);
+            ctx.reply('✅ Laporan Teks berhasil masuk database!');
+        } else {
+            ctx.reply("❌ Gagal: URL Webhook belum disetting di Railway.");
+        }
+    } catch (error) {
+        console.error('❌ Gagal kirim teks:', error.message);
+        ctx.telegram.deleteMessage(ctx.chat.id, loading.message_id).catch(() => {});
+        ctx.reply('❌ Gagal mengirim laporan ke server n8n.');
+    }
+});
+
+// --- START BOT ---
 bot.launch();
 console.log('🤖 Bot Update Aslap SIAP!');
 
