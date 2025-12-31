@@ -11,33 +11,42 @@ if (!BOT_TOKEN) {
     process.exit(1);
 }
 
+if (!N8N_WEBHOOK_URL) {
+    console.error("❌ ERROR: N8N_WEBHOOK_URL belum diisi!");
+    process.exit(1);
+}
+
 const bot = new Telegraf(BOT_TOKEN);
 bot.use(session());
 
 // ==========================================================
-// 1. INTEGRASI MODUL BARU (REKAPITULASI OTOMATIS)
+// 1. INTEGRASI MODUL REKAP
 // ==========================================================
 require('./fitur_rekap')(bot);
 
-
-// --- 2. FITUR TOMBOL MENU BIRU (COMMANDS) ---
+// ==========================================================
+// 2. COMMAND BOT
+// ==========================================================
 bot.telegram.setMyCommands([
     { command: 'start', description: '🏠 Mulai / Menu Utama' },
     { command: 'help', description: '❓ Bantuan' },
     { command: 'cancel', description: '❌ Batalkan Proses' }
 ]);
 
-// --- 3. TAMPILAN MENU UTAMA (MODEL KEYBOARD) ---
+// ==========================================================
+// 3. MENU UTAMA
+// ==========================================================
 const showMainMenu = (ctx) => {
-    const text = "👋 *Sistem Pelaporan SPPG*\n\nSilakan pilih Divisi Anda lewat tombol di bawah:";
-    
-    // Tombol Besar di Bawah Layar
-    const keyboard = Markup.keyboard([
-        ['💰 Akuntan', '🥦 Ahli Gizi'],
-        ['👷 Asisten Lapangan']
-    ]).resize(); 
-
-    ctx.reply(text, { parse_mode: 'Markdown', ...keyboard });
+    ctx.reply(
+        "👋 *Sistem Pelaporan SPPG*\n\nSilakan pilih Divisi:",
+        {
+            parse_mode: 'Markdown',
+            ...Markup.keyboard([
+                ['💰 Akuntan', '🥦 Ahli Gizi'],
+                ['👷 Asisten Lapangan']
+            ]).resize()
+        }
+    );
 };
 
 bot.start((ctx) => {
@@ -45,60 +54,65 @@ bot.start((ctx) => {
     showMainMenu(ctx);
 });
 
-// --- 4. MENANGKAP TOMBOL KEYBOARD ---
-
-// A. Divisi Akuntan
+// ==========================================================
+// 4. MENU DIVISI
+// ==========================================================
 bot.hears('💰 Akuntan', (ctx) => {
-    const text = "📂 *Divisi Akuntan*\nSilakan pilih jenis dokumen:";
-    const keyboard = Markup.inlineKeyboard([
-        [Markup.button.callback('📄 Nota PO', 'pilih_PO')],
-        [Markup.button.callback('📊 RAB Harian', 'pilih_RAB')],
-        [Markup.button.callback('📒 Laporan Keuangan', 'pilih_Laporan')],
-        [Markup.button.callback('❌ Tutup', 'tutup_menu')]
-    ]);
-    ctx.reply(text, { parse_mode: 'Markdown', ...keyboard });
-});
-
-// B. Divisi Ahli Gizi
-bot.hears('🥦 Ahli Gizi', (ctx) => {
-    const text = "🥦 *Divisi Ahli Gizi*\nSilakan pilih jenis dokumen:";
-    const keyboard = Markup.inlineKeyboard([
-        [Markup.button.callback('🍲 Menu Harian', 'pilih_MenuGizi')],
-        [Markup.button.callback('👁️ Uji Organoleptik', 'pilih_Organoleptik')],
-        [Markup.button.callback('❌ Tutup', 'tutup_menu')]
-    ]);
-    ctx.reply(text, { parse_mode: 'Markdown', ...keyboard });
-});
-
-// C. Divisi Asisten Lapangan
-bot.hears('👷 Asisten Lapangan', (ctx) => {
-    const text = "👷 *Divisi Aslap*\nSilakan pilih jenis dokumen:";
-    const keyboard = Markup.inlineKeyboard([
-        [Markup.button.callback('📸 Foto Menu Jadi', 'pilih_FotoMenu')],
-        [Markup.button.callback('📦 Penerimaan Barang', 'pilih_Barang')],
-        
-        // Tombol ini nanti akan ditangani oleh fitur_rekap.js
-        [Markup.button.callback('📝 Rekap PM Harian', 'pilih_RekapPM')],            
-
-        [Markup.button.callback('🚚 Dokumentasi Distribusi', 'pilih_DokDistribusi')],
-        [Markup.button.callback('❌ Tutup', 'tutup_menu')]
-    ]);
-    ctx.reply(text, { parse_mode: 'Markdown', ...keyboard });
-});
-
-// --- 5. LOGIKA PILIHAN & UPLOAD (FILE/FOTO) ---
-
-const handleChoice = (ctx, kategori, namaLengkap) => {
-    ctx.session = { waitingForUpload: true, kategori: kategori };
-    const label = namaLengkap || kategori;
-    
     ctx.reply(
-        `✅ Kategori terpilih: *${label}*.\n\nSilakan **KIRIM FOTO/FILE** sekarang.`, 
-        { parse_mode: 'Markdown', ...Markup.removeKeyboard() } 
+        "📂 *Divisi Akuntan*",
+        {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+                [Markup.button.callback('📄 Nota PO', 'pilih_PO')],
+                [Markup.button.callback('📊 RAB Harian', 'pilih_RAB')],
+                [Markup.button.callback('📒 Laporan Keuangan', 'pilih_Laporan')],
+                [Markup.button.callback('❌ Tutup', 'tutup_menu')]
+            ])
+        }
+    );
+});
+
+bot.hears('🥦 Ahli Gizi', (ctx) => {
+    ctx.reply(
+        "🥦 *Divisi Ahli Gizi*",
+        {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+                [Markup.button.callback('🍲 Menu Harian', 'pilih_MenuGizi')],
+                [Markup.button.callback('👁️ Uji Organoleptik', 'pilih_Organoleptik')],
+                [Markup.button.callback('❌ Tutup', 'tutup_menu')]
+            ])
+        }
+    );
+});
+
+bot.hears('👷 Asisten Lapangan', (ctx) => {
+    ctx.reply(
+        "👷 *Divisi Asisten Lapangan*",
+        {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+                [Markup.button.callback('📸 Foto Menu Jadi', 'pilih_FotoMenu')],
+                [Markup.button.callback('📦 Penerimaan Barang', 'pilih_Barang')],
+                [Markup.button.callback('📝 Rekap PM Harian', 'pilih_RekapPM')],
+                [Markup.button.callback('🚚 Dokumentasi Distribusi', 'pilih_DokDistribusi')],
+                [Markup.button.callback('❌ Tutup', 'tutup_menu')]
+            ])
+        }
+    );
+});
+
+// ==========================================================
+// 5. PILIH KATEGORI
+// ==========================================================
+const handleChoice = (ctx, kategori, label = kategori) => {
+    ctx.session = { waitingForUpload: true, kategori };
+    ctx.reply(
+        `✅ Kategori: *${label}*\n\nSilakan kirim FILE / FOTO.`,
+        { parse_mode: 'Markdown', ...Markup.removeKeyboard() }
     );
 };
 
-// Daftarkan Tombol Upload
 bot.action('pilih_PO', (ctx) => handleChoice(ctx, 'PO'));
 bot.action('pilih_RAB', (ctx) => handleChoice(ctx, 'RAB'));
 bot.action('pilih_Laporan', (ctx) => handleChoice(ctx, 'Laporan'));
@@ -109,93 +123,91 @@ bot.action('pilih_Barang', (ctx) => handleChoice(ctx, 'Barang'));
 bot.action('pilih_DokDistribusi', (ctx) => handleChoice(ctx, 'Distribusi', 'Dokumentasi Distribusi'));
 
 bot.action('tutup_menu', (ctx) => ctx.deleteMessage());
+
 bot.command('cancel', (ctx) => {
     ctx.session = {};
-    ctx.reply("Proses dibatalkan.", Markup.removeKeyboard());
-    setTimeout(() => showMainMenu(ctx), 1000);
+    ctx.reply("❌ Proses dibatalkan.");
+    setTimeout(() => showMainMenu(ctx), 500);
 });
 
-// --- 6. PROSES UPLOAD FILE KE N8N ---
+// ==========================================================
+// 6. UPLOAD FILE KE N8N (VERSI FINAL)
+// ==========================================================
 bot.on(['photo', 'document'], async (ctx) => {
-    // Cek apakah user sudah menekan tombol kategori sebelumnya?
-    if (!ctx.session || !ctx.session.waitingForUpload) {
-        return ctx.reply("⚠️ Silakan klik tombol Divisi di bawah dulu untuk memilih kategori.", {
-            ...Markup.keyboard([
-                ['💰 Akuntan', '🥦 Ahli Gizi'],
-                ['👷 Asisten Lapangan']
-            ]).resize()
-        });
+    if (!ctx.session?.waitingForUpload) {
+        return showMainMenu(ctx);
     }
 
+    const loading = await ctx.reply("🚀 Mengirim file ke server...");
+
     try {
-        const loading = await ctx.reply("🚀 Sedang mengirim file ke arsip...");
-        let fileId = ctx.message.photo ? ctx.message.photo[ctx.message.photo.length - 1].file_id : ctx.message.document.file_id;
+        const fileId = ctx.message.photo
+            ? ctx.message.photo[ctx.message.photo.length - 1].file_id
+            : ctx.message.document.file_id;
+
         const fileLink = await ctx.telegram.getFileLink(fileId);
 
-        if (N8N_WEBHOOK_URL) {
-            await axios.post(N8N_WEBHOOK_URL, {
-                type: 'file', // <--- Penanda untuk Switch n8n (Jalur Atas)
-                fileUrl: fileLink.href,
-                kategori: ctx.session.kategori,
-                sender: ctx.from.first_name
-            });
-            await ctx.telegram.deleteMessage(ctx.chat.id, loading.message_id);
-            await ctx.reply(`✅ *Sukses!* Dokumen berhasil disimpan.`);
-        } else {
-            ctx.reply("❌ Link n8n error (Environment Variable kosong).");
-        }
-        
-        ctx.session = {};
-        showMainMenu(ctx);
+        const res = await axios.post(N8N_WEBHOOK_URL, {
+            type: 'file',
+            fileUrl: fileLink.href,
+            kategori: ctx.session.kategori,
+            sender: ctx.from.first_name
+        });
 
-    } catch (error) {
-        console.error("Error File:", error);
-        ctx.reply("❌ Gagal upload file.");
+        await ctx.telegram.deleteMessage(ctx.chat.id, loading.message_id);
+
+        // 🔑 VALIDASI RESPOND n8n
+        if (!res.data || res.data.success !== true) {
+            throw new Error(res.data?.error || 'Upload gagal di n8n');
+        }
+
+        await ctx.reply("✅ File BERHASIL disimpan di Google Drive");
+
+    } catch (err) {
+        console.error("❌ Upload Error:", err.message);
+        await ctx.reply("❌ Upload GAGAL. Silakan coba ulang.");
     }
+
+    ctx.session = {};
+    showMainMenu(ctx);
 });
 
-// --- 7. HANDLER TEXT LAPORAN (PENAMBAHAN BARU) ---
-// Ini akan menangkap teks biasa yang diketik user
+// ==========================================================
+// 7. LAPORAN TEKS
+// ==========================================================
 bot.on('text', async (ctx) => {
-    const textPesan = ctx.message.text;
+    const text = ctx.message.text;
+    if (text.startsWith('/')) return;
 
-    // Filter 1: Jangan respon jika itu Command (awalan /)
-    if (textPesan.startsWith('/')) return;
-
-    // Filter 2: Jangan respon jika itu Tombol Menu Utama (supaya tidak double)
-    if (['💰 Akuntan', '🥦 Ahli Gizi', '👷 Asisten Lapangan'].includes(textPesan)) return;
-
-    // Filter 3: Jangan respon tombol Cancel
-    if (textPesan === '❌ Batalkan Proses') return;
-
-    console.log(`📨 Menerima Teks Laporan: ${textPesan}`);
-    const loading = await ctx.reply('⏳ Sedang meneruskan laporan teks ke database...');
+    const loading = await ctx.reply("⏳ Mengirim laporan teks...");
 
     try {
-        if (N8N_WEBHOOK_URL) {
-            // Kirim ke n8n
-            await axios.post(N8N_WEBHOOK_URL, {
-                type: 'text',              // <--- PENTING: Kunci untuk Switch n8n (Jalur Bawah)
-                textContent: textPesan,    // Isi Laporan
-                sender: ctx.from.first_name,
-                date: new Date().toISOString()
-            });
-            
-            await ctx.telegram.deleteMessage(ctx.chat.id, loading.message_id);
-            ctx.reply('✅ Laporan Teks berhasil masuk database!');
-        } else {
-            ctx.reply("❌ Gagal: URL Webhook belum disetting di Railway.");
+        const res = await axios.post(N8N_WEBHOOK_URL, {
+            type: 'text',
+            textContent: text,
+            sender: ctx.from.first_name,
+            date: new Date().toISOString()
+        });
+
+        await ctx.telegram.deleteMessage(ctx.chat.id, loading.message_id);
+
+        if (!res.data || res.data.success !== true) {
+            throw new Error('Gagal simpan laporan');
         }
-    } catch (error) {
-        console.error('❌ Gagal kirim teks:', error.message);
-        ctx.telegram.deleteMessage(ctx.chat.id, loading.message_id).catch(() => {});
-        ctx.reply('❌ Gagal mengirim laporan ke server n8n.');
+
+        ctx.reply("✅ Laporan teks berhasil disimpan");
+
+    } catch (err) {
+        console.error(err.message);
+        ctx.reply("❌ Gagal mengirim laporan teks");
     }
 });
 
-// --- START BOT ---
+// ==========================================================
+// START BOT
+// ==========================================================
 bot.launch();
-console.log('🤖 Bot Update Aslap SIAP!');
+console.log("🤖 Bot SPPG AKTIF");
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
